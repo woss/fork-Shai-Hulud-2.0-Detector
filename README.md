@@ -152,7 +152,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: gensecaihq/Shai-Hulud-2.0-Detector@v1
+      - uses: gensecaihq/Shai-Hulud-2.0-Detector@v2
         with:
           fail-on-critical: true
 ```
@@ -325,13 +325,13 @@ The easiest way to use Shai-Hulud Detector is as a GitHub Action. **Now availabl
 #### Minimal Setup
 
 ```yaml
-- uses: gensecaihq/Shai-Hulud-2.0-Detector@v1
+- uses: gensecaihq/Shai-Hulud-2.0-Detector@v2
 ```
 
 #### Full Setup with All Options
 
 ```yaml
-- uses: gensecaihq/Shai-Hulud-2.0-Detector@v1
+- uses: gensecaihq/Shai-Hulud-2.0-Detector@v2
   with:
     fail-on-critical: true
     fail-on-high: false
@@ -521,7 +521,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: gensecaihq/Shai-Hulud-2.0-Detector@v1
+      - uses: gensecaihq/Shai-Hulud-2.0-Detector@v2
 ```
 
 #### Scan Only Dependency Files
@@ -547,7 +547,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: gensecaihq/Shai-Hulud-2.0-Detector@v1
+      - uses: gensecaihq/Shai-Hulud-2.0-Detector@v2
 ```
 
 #### Scheduled Daily Scans
@@ -564,7 +564,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: gensecaihq/Shai-Hulud-2.0-Detector@v1
+      - uses: gensecaihq/Shai-Hulud-2.0-Detector@v2
         with:
           fail-on-any: true
 ```
@@ -608,7 +608,7 @@ jobs:
 #### Strict Mode - Fail on Any Detection
 
 ```yaml
-- uses: gensecaihq/Shai-Hulud-2.0-Detector@v1
+- uses: gensecaihq/Shai-Hulud-2.0-Detector@v2
   with:
     fail-on-any: true
 ```
@@ -616,7 +616,7 @@ jobs:
 #### Warning Mode - Report but Don't Fail
 
 ```yaml
-- uses: gensecaihq/Shai-Hulud-2.0-Detector@v1
+- uses: gensecaihq/Shai-Hulud-2.0-Detector@v2
   with:
     fail-on-critical: false
     fail-on-high: false
@@ -630,7 +630,7 @@ The detector automatically scans subdirectories for package files (up to 5 level
 #### Scan Entire Monorepo
 
 ```yaml
-- uses: gensecaihq/Shai-Hulud-2.0-Detector@v1
+- uses: gensecaihq/Shai-Hulud-2.0-Detector@v2
   with:
     working-directory: '.'
     scan-lockfiles: true
@@ -639,7 +639,7 @@ The detector automatically scans subdirectories for package files (up to 5 level
 #### Scan Specific Package
 
 ```yaml
-- uses: gensecaihq/Shai-Hulud-2.0-Detector@v1
+- uses: gensecaihq/Shai-Hulud-2.0-Detector@v2
   with:
     working-directory: './packages/frontend'
 ```
@@ -655,7 +655,7 @@ jobs:
         package: [frontend, backend, shared, cli]
     steps:
       - uses: actions/checkout@v4
-      - uses: gensecaihq/Shai-Hulud-2.0-Detector@v1
+      - uses: gensecaihq/Shai-Hulud-2.0-Detector@v2
         with:
           working-directory: './packages/${{ matrix.package }}'
 ```
@@ -667,7 +667,7 @@ Generate SARIF reports for GitHub Security tab integration:
 #### Basic SARIF Output
 
 ```yaml
-- uses: gensecaihq/Shai-Hulud-2.0-Detector@v1
+- uses: gensecaihq/Shai-Hulud-2.0-Detector@v2
   with:
     output-format: sarif
 
@@ -830,7 +830,7 @@ When running locally or in non-GitHub CI systems:
 ------------------------------------------------------------
   Files scanned: 2
   Scan time: 67ms
-  Database version: 1.0.0
+  Database version: 2.0.0
 ============================================================
 
   IMMEDIATE ACTIONS REQUIRED:
@@ -917,15 +917,27 @@ Check `compromised-packages.json` for the full list with version information.
 
 If you find these files in your project or `node_modules`, you may be compromised:
 
-| File | SHA-1 Hash | Purpose |
-|------|------------|---------|
-| `setup_bun.js` | `d1829b4708126dcc7bea7437c04d1f10eacd4a16` | Downloads Bun runtime |
-| `bun_environment.js` | `d60ec97eea19fffb4809bc35b91033b52490ca11` | Executes malicious payload (10MB+ obfuscated) |
-| `actionsSecrets.json` | - | Stolen GitHub Actions secrets |
-| `cloud.json` | - | Stores stolen cloud credentials |
-| `contents.json` | - | Contains exfiltrated data |
-| `environment.json` | - | Holds environment variables |
-| `truffleSecrets.json` | - | TruffleHog scan results |
+| File | SHA-1 Hash | SHA-256 Hash | Purpose |
+|------|------------|--------------|---------|
+| `setup_bun.js` | `d1829b47...` | `a3894003ad1d293ba96d77881ccd2071...` | Downloads Bun runtime |
+| `bun_environment.js` | `d60ec97e...` | Multiple variants (6+ hashes) | Executes malicious payload (10MB+ obfuscated) |
+| `actionsSecrets.json` | - | - | Stolen GitHub Actions secrets (double Base64 encoded) |
+| `trufflehog_output.json` | - | - | TruffleHog credential scan results |
+| `cloud.json` | - | - | Stores stolen cloud credentials |
+| `contents.json` | - | - | Contains exfiltrated data |
+| `environment.json` | - | - | Holds environment variables |
+| `truffleSecrets.json` | - | - | TruffleHog scan results |
+
+### Runner Installation Artifacts
+
+The attack installs rogue GitHub Actions runners. Check for:
+
+| Artifact | Location | Description |
+|----------|----------|-------------|
+| `.dev-env/` | `$HOME/.dev-env/` | Runner installation directory |
+| `actions-runner-linux-x64-2.330.0.tar.gz` | Various | Specific runner version used by attack |
+| `.config/gcloud/application_default_credentials.json` | `$HOME/` | Targeted credential file |
+| `.npmrc` | `$HOME/` | Targeted npm credentials |
 
 ### Malicious Workflows
 
@@ -935,8 +947,11 @@ Check `.github/workflows/` for these suspicious patterns:
 |---------|-------------|
 | `discussion.yaml` or `discussion.yml` | Injected workflow for remote execution |
 | `formatter_*.yml` | Malicious workflow with random suffix (e.g., `formatter_abc123.yml`) |
+| `on: discussion` trigger | Command injection backdoor trigger (🆕 v2.0.0) |
 
 These workflows typically use `SHA1HULUD` self-hosted runners to execute malicious code.
+
+**New in v2.0.0:** The detector now scans workflow files for `on: discussion` triggers, which are used by the attack to create command injection backdoors that persist even after the initial infection is cleaned.
 
 ### GitHub Indicators
 

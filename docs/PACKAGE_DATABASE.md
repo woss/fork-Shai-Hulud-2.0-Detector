@@ -46,12 +46,12 @@ The `compromised-packages.json` file is the heart of the Shai-Hulud 2.0 Detector
 /compromised-packages.json
 ```
 
-### Schema
+### Schema (v2.0.0)
 
 ```json
 {
-  "version": "1.0.0",
-  "lastUpdated": "2025-11-25T10:00:00Z",
+  "version": "2.0.0",
+  "lastUpdated": "2025-12-02T00:00:00Z",
   "attackInfo": {
     "name": "Shai-Hulud 2.0",
     "alias": "The Second Coming",
@@ -59,16 +59,28 @@ The `compromised-packages.json` file is the heart of the Shai-Hulud 2.0 Detector
     "description": "..."
   },
   "indicators": {
-    "maliciousFiles": ["setup_bun.js", "bun_environment.js", ...],
-    "maliciousWorkflows": [".github/workflows/discussion.yaml", ...],
+    "maliciousFiles": ["setup_bun.js", "bun_environment.js", "actionsSecrets.json", ...],
+    "maliciousWorkflows": [".github/workflows/discussion.yaml", ".github/workflows/formatter_*.yml", ...],
     "fileHashes": {
-      "bun_environment.js": "d60ec97eea19fffb4809bc35b91033b52490ca11",
-      "setup_bun.js": "d1829b4708126dcc7bea7437c04d1f10eacd4a16"
+      "setup_bun.js": {
+        "sha1": "d1829b4708126dcc7bea7437c04d1f10eacd4a16",
+        "sha256": "a3894003ad1d293ba96d77881ccd2071446dc3f65f434669b49b3da92421901a"
+      },
+      "bun_environment.js": {
+        "sha1": "d60ec97eea19fffb4809bc35b91033b52490ca11",
+        "sha256": ["62ee164b...", "cbb9bc5a...", "..."]  // Multiple variants
+      }
     },
     "gitHubIndicators": {
       "runnerName": "SHA1HULUD",
-      "repoDescription": "Shai-Hulud: The Second Coming"
-    }
+      "repoDescription": "Shai-Hulud: The Second Coming",
+      "repoNamePattern": "[0-9a-z]{18}",
+      "workflowTrigger": "on: discussion"
+    },
+    "runnerPaths": ["$HOME/.dev-env/", "actions-runner-linux-x64-2.330.0.tar.gz"],
+    "credentialPaths": [".config/gcloud/application_default_credentials.json", ".npmrc"],
+    "primaryInfectionVectors": ["@postman/tunnel-agent@0.6.7", "posthog-node", "@asyncapi/specs@6.8.3"],
+    "mavenPackages": ["org.mvnpm:posthog-node:4.18.1"]
   },
   "stats": {
     "totalUniquePackages": 790,
@@ -81,11 +93,29 @@ The `compromised-packages.json` file is the heart of the Shai-Hulud 2.0 Detector
       "affectedVersions": ["*"]
     }
   ],
-  "sources": [
-    "https://..."
-  ]
+  "sources": ["https://..."],
+  "acknowledgements": {
+    "securityResearchers": [
+      {"org": "Wiz", "github": "wiz-sec"},
+      {"org": "Datadog Security Labs", "github": "DataDog"},
+      ...
+    ]
+  }
 }
 ```
+
+### New in v2.0.0
+
+| Field | Description |
+|-------|-------------|
+| `indicators.fileHashes` | Now supports both SHA-1 and SHA-256 hashes, with multiple variants per file |
+| `indicators.gitHubIndicators.repoNamePattern` | Regex pattern for malicious repo names |
+| `indicators.gitHubIndicators.workflowTrigger` | Malicious workflow trigger pattern |
+| `indicators.runnerPaths` | Paths where rogue runners are installed |
+| `indicators.credentialPaths` | Targeted credential file paths |
+| `indicators.primaryInfectionVectors` | Known initial infection packages |
+| `indicators.mavenPackages` | Maven/Java ecosystem packages affected |
+| `acknowledgements` | Credits for security researchers |
 
 ### Package Entry Fields
 
