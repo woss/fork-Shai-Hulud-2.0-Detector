@@ -42,5 +42,8 @@ coverage/
 *.bak
 *.orig
 
+# Planning docs (local only)
+PLAN-*.md
+
 # Marketing
 index.htm
