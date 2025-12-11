@@ -695,14 +695,14 @@ In case you use a custom pre-/postinstall script, which gets detected, the safes
 ```
 
 If you use a different file than the existing `.shai-hulud-allowlist.json`, configure the action to use the allowlist:
-```
+```yaml
 - uses: gensecaihq/Shai-Hulud-2.0-Detector@v2
   with:
     allowlist-path: '.custom-allowlist.json'
 ```
 
 You can also choose to ignore the allowlist completely (not recommended) or still warn on allowlisted findings:
-```
+```yaml
 - uses: gensecaihq/Shai-Hulud-2.0-Detector@v2
   with:
     ignore-allowlist: false
