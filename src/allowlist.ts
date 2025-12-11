@@ -121,6 +121,11 @@ function matchesFinding(finding: SecurityFinding, entry: AllowlistEntry): boolea
 		}
 	}
 
+	// Check exact SHA256 match (if specified)
+	if (entry.sha256 !== undefined && entry.sha256 !== finding.sha256) {
+		return false;
+	}
+
 	// All specified fields matched
 	return true;
 }
