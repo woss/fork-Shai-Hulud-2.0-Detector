@@ -858,6 +858,8 @@ export function checkSuspiciousScripts(filePath: string): SecurityFinding[] {
 	for (const [scriptName, scriptContent] of Object.entries(pkg.scripts)) {
 		if (!scriptContent) continue;
 
+		const scriptSha256 = SHA256(scriptContent);
+
 		// Check all suspicious patterns
 		// NOTE: Patterns are designed to avoid false positives (e.g., --eval vs shell eval)
 		for (const { pattern, description } of SUSPICIOUS_SCRIPT_PATTERNS) {
@@ -893,6 +895,7 @@ export function checkSuspiciousScripts(filePath: string): SecurityFinding[] {
 						: `${description}. This pattern is commonly used in supply chain attacks.`,
 					location: filePath,
 					evidence: `"${scriptName}": "${scriptContent.substring(0, 200)}${scriptContent.length > 200 ? '...' : ''}"`,
+					sha256: scriptSha256,
 				});
 				break; // Only report first match per script
 			}
@@ -942,6 +945,8 @@ export function checkTrufflehogActivity(directory: string): SecurityFinding[] {
 						try {
 							const content = fs.readFileSync(fullPath, 'utf8');
 
+							const contentSha256 = SHA256(content);
+
 							// Skip if this is the detector's own source code
 							if (isDetectorSourceCode(content)) {
 								continue;
@@ -956,6 +961,7 @@ export function checkTrufflehogActivity(directory: string): SecurityFinding[] {
 										description: `${description}. This may indicate automated credential theft as part of the Shai-Hulud attack.`,
 										location: fullPath,
 										evidence: pattern.toString(),
+										sha256: contentSha256,
 									});
 									break;
 								}
@@ -971,6 +977,7 @@ export function checkTrufflehogActivity(directory: string): SecurityFinding[] {
 										description: `${description}. This endpoint may be used to exfiltrate stolen credentials.`,
 										location: fullPath,
 										evidence: pattern.toString(),
+										sha256: contentSha256,
 									});
 									break;
 								}
@@ -986,6 +993,7 @@ export function checkTrufflehogActivity(directory: string): SecurityFinding[] {
 									description: `${exfilCheck.evidence}. Code appears to exfiltrate data to an external endpoint.`,
 									location: fullPath,
 									evidence: 'exfiltration + network/encoding context',
+									sha256: contentSha256,
 								});
 							}
 						} catch {
@@ -1109,6 +1117,7 @@ export function checkSecretsExfiltration(directory: string): SecurityFinding[] {
 					) {
 						try {
 							const content = fs.readFileSync(fullPath, 'utf8');
+							const contentSha256 = SHA256(content);
 							// Check if it looks like base64 encoded data
 							if (/^[A-Za-z0-9+/=]{100,}$/m.test(content)) {
 								findings.push({
@@ -1117,6 +1126,7 @@ export function checkSecretsExfiltration(directory: string): SecurityFinding[] {
 									title: `Potential secrets file with encoded data`,
 									description: `Found "${entry.name}" containing what appears to be Base64 encoded data. This may be exfiltrated credentials.`,
 									location: fullPath,
+									sha256: contentSha256,
 								});
 							}
 						} catch {
@@ -1195,6 +1205,8 @@ export function checkMaliciousRunners(directory: string): SecurityFinding[] {
 						continue;
 					}
 
+					const contentSha256 = SHA256(content);
+
 					// Check for malicious runner patterns
 					for (const { pattern, description } of MALICIOUS_RUNNER_PATTERNS) {
 						if (pattern.test(content)) {
@@ -1205,6 +1217,7 @@ export function checkMaliciousRunners(directory: string): SecurityFinding[] {
 								description: `${description}. The SHA1HULUD runner is used by the Shai-Hulud attack to execute credential theft in CI/CD environments.`,
 								location: fullPath,
 								evidence: pattern.toString(),
+								sha256: contentSha256,
 							});
 						}
 					}
@@ -1219,6 +1232,7 @@ export function checkMaliciousRunners(directory: string): SecurityFinding[] {
 								description: `${description}. The Shai-Hulud attack uses discussion events to trigger command injection backdoors.`,
 								location: fullPath,
 								evidence: pattern.toString(),
+								sha256: contentSha256,
 							});
 							break; // Only report once per file
 						}
@@ -1238,6 +1252,7 @@ export function checkMaliciousRunners(directory: string): SecurityFinding[] {
 									description: `${description}. This workflow may be configured to exfiltrate data to attacker-controlled repositories.`,
 									location: fullPath,
 									evidence: pattern.toString(),
+									sha256: contentSha256,
 								});
 							}
 						}
@@ -1272,6 +1287,7 @@ export function checkShaiHuludRepos(directory: string): SecurityFinding[] {
 			const contentWithoutLegitRefs =
 				stripLegitimateSecurityReferences(content);
 
+			const contentSha256 = SHA256(content);
 			for (const { pattern, description } of SHAI_HULUD_REPO_PATTERNS) {
 				if (pattern.test(contentWithoutLegitRefs)) {
 					findings.push({
@@ -1280,6 +1296,7 @@ export function checkShaiHuludRepos(directory: string): SecurityFinding[] {
 						title: `Shai-Hulud repository reference in git config`,
 						description: `${description}. Your repository may have been configured to push to an attacker-controlled remote.`,
 						location: gitConfigPath,
+						sha256: contentSha256,
 					});
 				}
 			}
@@ -1297,6 +1314,7 @@ export function checkShaiHuludRepos(directory: string): SecurityFinding[] {
 			const contentWithoutLegitRefs =
 				stripLegitimateSecurityReferences(content);
 
+			const contentSha256 = SHA256(content);
 			for (const { pattern, description } of SHAI_HULUD_REPO_PATTERNS) {
 				if (pattern.test(contentWithoutLegitRefs)) {
 					findings.push({
@@ -1305,6 +1323,7 @@ export function checkShaiHuludRepos(directory: string): SecurityFinding[] {
 						title: `Shai-Hulud reference in package.json`,
 						description: `${description}. Package may be configured to reference attacker infrastructure.`,
 						location: file,
+						sha256: contentSha256,
 					});
 				}
 			}
@@ -1397,6 +1416,12 @@ export function checkSuspiciousBranches(directory: string): SecurityFinding[] {
 	return findings;
 }
 
+function SHA256(data: crypto.BinaryLike): string {
+	return crypto.createHash('sha256')
+		.update(data)
+		.digest('hex');
+}
+
 /**
  * Calculate SHA256 hash of a file for malware signature matching.
  * @param filePath Path to the file.
@@ -1405,7 +1430,7 @@ export function checkSuspiciousBranches(directory: string): SecurityFinding[] {
 function calculateSHA256(filePath: string): string | null {
 	try {
 		const content = fs.readFileSync(filePath);
-		return crypto.createHash('sha256').update(content).digest('hex');
+		return SHA256(content);
 	} catch {
 		return null;
 	}
@@ -1441,6 +1466,7 @@ export function checkMalwareHashes(directory: string): SecurityFinding[] {
 							description: `File "${entry.name}" matches a known SHA256 hash from the Shai-Hulud attack. This is a confirmed malicious payload.`,
 							location: fullPath,
 							evidence: `SHA256: ${hash}`,
+							//sha256: hash, // Do not add this sha here, as we don't want to accidentally allowlist this
 						});
 					}
 				} else if (

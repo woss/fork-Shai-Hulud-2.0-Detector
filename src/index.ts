@@ -284,6 +284,8 @@ async function run(): Promise<void> {
 				allowlist = loadAllowlist(allowlistPath);
 				if (allowlist.length > 0) {
 					core.info(`Loaded ${allowlist.length} allowlist entries from ${allowlistPath}`);
+				} else if (inputs.allowlistPath !== ".shai-hulud-allowlist.json") {
+					core.info(`Allowlist path set but no allowlist entries found (file not present or empty): ${allowlistPath}`);
 				}
 			} catch (error) {
 				// FAIL on malformed allowlist - safest approach per @buggedcom

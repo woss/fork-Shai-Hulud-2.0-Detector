@@ -345,6 +345,9 @@ The easiest way to use Shai-Hulud Detector is as a GitHub Action. **Now availabl
     scan-node-modules: false
     output-format: text
     working-directory: '.'
+    allowlist-path: '.shai-hulud-allowlist.json'
+    ignore-allowlist: false
+    warn-on-allowlist: false
 ```
 
 ### Local CLI Usage
@@ -357,8 +360,6 @@ You can also run the detector locally for development or CI systems without GitH
 # Clone and run
 git clone https://github.com/gensecaihq/Shai-Hulud-2.0-Detector.git
 cd Shai-Hulud-2.0-Detector
-npm install
-npm run build
 ```
 
 #### Set Options
@@ -382,6 +383,9 @@ Options:
 --scan-node-modules=false
 --output-format="json"
 --working-directory="/path/to/your/project"
+--allowlist-path=".shai-hulud-allowlist.json"
+--ignore-allowlist=false
+--warn-on-allowlist=false
 ```
 
 ##### Via Environment Variables (option 2)
@@ -394,6 +398,9 @@ export INPUT_SCAN_LOCKFILES=true
 export INPUT_SCAN_NODE_MODULES=false
 export INPUT_OUTPUT_FORMAT="json"
 export INPUT_WORKING_DIRECTORY="/path/to/your/project"
+export INPUT_ALLOWLIST_PATH=".shai-hulud-allowlist.json"
+export INPUT_IGNORE_ALLOWLIST=false
+export INPUT_WARN_ON_ALLOWLIST=false
 
 node dist/index.js
 ```
@@ -407,6 +414,9 @@ $Env:INPUT_SCAN_LOCKFILES="true"
 $Env:INPUT_SCAN_NODE_MODULES="true"
 $Env:INPUT_OUTPUT_FORMAT="json"
 $Env:INPUT_WORKING_DIRECTORY="/path/to/your/project"
+$Env:INPUT_ALLOWLIST_PATH=".shai-hulud-allowlist.json"
+$Env:INPUT_IGNORE_ALLOWLIST="false"
+$Env:INPUT_WARN_ON_ALLOWLIST="false"
 
 node dist/index.js
 ```
@@ -628,6 +638,77 @@ jobs:
     fail-on-any: false
 ```
 
+#### Exclude findings/false-positives (allowlist)
+
+If the detector has findings which you are certain are false-positives you can create an allowlist file named `.shai-hulud-allowlist.json` with the following structure:
+
+```json
+[
+  {
+    "type": "shai-hulud-repo",
+    "titleContains": "Shai-Hulud reference",
+    "locationContains": ".github/workflows",
+    "comment": "Self-reference: This repository IS the Shai-Hulud detector, so references to itself in workflows are expected"
+  },
+  {
+    "type": "shai-hulud-repo",
+    "titleContains": "Shai-Hulud reference",
+    "locationContains": "action.yml",
+    "comment": "Self-reference: Action metadata file references the action name"
+  }
+]
+```
+
+The full list of allowlist properties that can be used to match a finding are described in this schema:
+```typescript
+interface AllowlistEntry {
+    /** Finding type to match (e.g., 'suspicious-script', 'compromised-package') */
+    type?: SecurityFindingType;
+    /** Severity level to match */
+    severity?: 'critical' | 'high' | 'medium' | 'low';
+    /** Exact title match */
+    title?: string;
+    /** Substring match on title */
+    titleContains?: string;
+    /** Exact location/file path match */
+    location?: string;
+    /** Substring match on location */
+    locationContains?: string;
+    /** Substring match on evidence field */
+    evidenceContains?: string;
+    /** Exact SHA256 hash match, used for file and script contents */
+    sha256?: string;
+    /** Documentation comment (not used in matching) */
+    comment?: string;
+}
+```
+
+In case you use a custom pre-/postinstall script, which gets detected, the safest way to allowlist it is to use the `sha256` property to match the exact script content hash (potentially with a location matcher).
+```json
+[
+  {
+    "type": "suspicious-script",
+    "sha256": "4118fdd78455decc4d9c8a8d3f3eca4548b4e73ff50f994a5bb6ef90676949ad",
+    "comment": "Custom install script used for internal setup"
+  }
+]
+```
+
+If you use a different file than the existing `.shai-hulud-allowlist.json`, configure the action to use the allowlist:
+```yaml
+- uses: gensecaihq/Shai-Hulud-2.0-Detector@v2
+  with:
+    allowlist-path: '.custom-allowlist.json'
+```
+
+You can also choose to ignore the allowlist completely (not recommended) or still warn on allowlisted findings:
+```yaml
+- uses: gensecaihq/Shai-Hulud-2.0-Detector@v2
+  with:
+    ignore-allowlist: false
+    warn-on-allowlist: true
+```
+
 ### Monorepo Support
 
 The detector automatically scans subdirectories for package files (up to 5 levels deep).
@@ -748,55 +829,64 @@ Access scan results for conditional logic or notifications:
 
 ### Inputs Reference
 
-| Input | Description | Type | Default |
-|-------|-------------|------|---------|
-| `fail-on-critical` | Fail workflow if critical severity packages are found | `boolean` | `true` |
-| `fail-on-high` | Fail workflow if high or critical severity packages are found | `boolean` | `false` |
-| `fail-on-any` | Fail workflow if any compromised packages are found | `boolean` | `false` |
-| `scan-lockfiles` | Scan lockfiles for transitive dependencies | `boolean` | `true` |
-| `scan-node-modules` | Scan node_modules directory (slower, more thorough) | `boolean` | `false` |
-| `output-format` | Output format: `text`, `json`, or `sarif` |  `'text' \| 'json' \| 'sarif'`  | `text` |
-| `working-directory` | Directory to scan (relative to repository root) | `string` | `.` |
+| Input               | Description                                                                     | Type                          | Default                      |
+|---------------------|---------------------------------------------------------------------------------|-------------------------------|------------------------------|
+| `fail-on-critical`  | Fail workflow if critical severity packages are found                           | `boolean`                     | `true`                       |
+| `fail-on-high`      | Fail workflow if high or critical severity packages are found                   | `boolean`                     | `false`                      |
+| `fail-on-any`       | Fail workflow if any compromised packages are found                             | `boolean`                     | `false`                      |
+| `scan-lockfiles`    | Scan lockfiles for transitive dependencies                                      | `boolean`                     | `true`                       |
+| `scan-node-modules` | Scan node_modules directory (slower, more thorough)                             | `boolean`                     | `false`                      |
+| `output-format`     | Output format: `text`, `json`, or `sarif`                                       | `'text' \| 'json' \| 'sarif'` | `text`                       |
+| `working-directory` | Directory to scan (relative to repository root)                                 | `string`                      | `.`                          |
+| `allowlist-path`    | Path to allowlist file for ignoring findings, relative to the working-directory | `string`                      | `.shai-hulud-allowlist.json` |
+| `ignore-allowlist`  | Ignore allowlist and report all findings                                        | `boolean`                     | `false`                      |
+| `warn-on-allowlist` | Warn on allowlisted findings instead of ignoring                                | `boolean`                     | `false`                      |
 
 ### Outputs Reference
 
-| Output | Description | Example |
-|--------|-------------|---------|
-| `affected-count` | Number of compromised packages detected | `3` |
-| `security-findings-count` | Number of security findings (scripts, runners, etc.) | `2` |
-| `status` | Overall scan status | `clean` or `affected` |
-| `scan-time` | Scan duration in milliseconds | `156` |
-| `results` | JSON array of detected packages | `[{"package":"posthog-node",...}]` |
-| `security-findings` | JSON array of security findings | `[{"type":"suspicious-script",...}]` |
-| `sarif-file` | Path to generated SARIF file (when output-format is sarif) | `shai-hulud-results.sarif` |
+| Output                    | Description                                                | Example                              |
+|---------------------------|------------------------------------------------------------|--------------------------------------|
+| `affected-count`          | Number of compromised packages detected                    | `3`                                  |
+| `security-findings-count` | Number of security findings (scripts, runners, etc.)       | `2`                                  |
+| `status`                  | Overall scan status                                        | `clean` or `affected`                |
+| `scan-time`               | Scan duration in milliseconds                              | `156`                                |
+| `results`                 | JSON array of detected packages                            | `[{"package":"posthog-node",...}]`   |
+| `security-findings`       | JSON array of security findings                            | `[{"type":"suspicious-script",...}]` |
+| `sarif-file`              | Path to generated SARIF file (when output-format is sarif) | `shai-hulud-results.sarif`           |
 
 ### CLI Arguments
 
 When running locally or in non-GitHub CI systems:
 
-| Variable | Maps To | Type | Default 
-|----------|---------|---------|---------|
-| `--fail-on-critical` | `fail-on-critical` input | `boolean` | `true` |
-| `--fail-on-high` | `fail-on-high` input | `boolean` | `false` |
-| `--fail-on-any` | `fail-on-any` input | `boolean` | `false` |
-| `--scan-lockfiles` | `scan-lockfiles` input | `boolean` | `true` |
-| `--scan-node-modules` | `scan-node-modules` input | `boolean` | `false` |
-| `--output-format` | `output-format` input | `'text' \| 'json' \| 'sarif'` | `text` |
-| `--working-directory` | `working-directory` input | `string` | `.` |
+| Variable              | Maps To                   | Type                          | Default                      |
+|-----------------------|---------------------------|-------------------------------|------------------------------|
+| `--fail-on-critical`  | `fail-on-critical` input  | `boolean`                     | `true`                       |
+| `--fail-on-high`      | `fail-on-high` input      | `boolean`                     | `false`                      |
+| `--fail-on-any`       | `fail-on-any` input       | `boolean`                     | `false`                      |
+| `--scan-lockfiles`    | `scan-lockfiles` input    | `boolean`                     | `true`                       |
+| `--scan-node-modules` | `scan-node-modules` input | `boolean`                     | `false`                      |
+| `--output-format`     | `output-format` input     | `'text' \| 'json' \| 'sarif'` | `text`                       |
+| `--working-directory` | `working-directory` input | `string`                      | `.`                          |
+| `--allowlist-path`    | `allowlist-path` input    | `string`                      | `.shai-hulud-allowlist.json` |
+| `--ignore-allowlist`  | `ignore-allowlist` input  | `boolean`                     | `false`                      |
+| `--warn-on-allowlist` | `warn-on-allowlist` input | `boolean`                     | `false`                      |
 
 ### Environment Variables
 
 When running locally or in non-GitHub CI systems:
 
-| Variable | Maps To | Type | Default 
-|----------|---------|---------|---------|
-| `INPUT_FAIL_ON_CRITICAL` | `fail-on-critical` input | `boolean` | `true` |
-| `INPUT_FAIL_ON_HIGH` | `fail-on-high` input | `boolean` | `false` |
-| `INPUT_FAIL_ON_ANY` | `fail-on-any` input | `boolean` | `false` |
-| `INPUT_SCAN_LOCKFILES` | `scan-lockfiles` input | `boolean` | `true` |
-| `INPUT_SCAN_NODE_MODULES` | `scan-node-modules` input | `boolean` | `false` |
-| `INPUT_OUTPUT_FORMAT` | `output-format` input | `'text' \| 'json' \| 'sarif'` | `text` | 
-| `INPUT_WORKING_DIRECTORY` | `working-directory` input | `string` | `.` |
+| Variable                  | Maps To                   | Type                          | Default                      |
+|---------------------------|---------------------------|-------------------------------|------------------------------|
+| `INPUT_FAIL_ON_CRITICAL`  | `fail-on-critical` input  | `boolean`                     | `true`                       |
+| `INPUT_FAIL_ON_HIGH`      | `fail-on-high` input      | `boolean`                     | `false`                      |
+| `INPUT_FAIL_ON_ANY`       | `fail-on-any` input       | `boolean`                     | `false`                      |
+| `INPUT_SCAN_LOCKFILES`    | `scan-lockfiles` input    | `boolean`                     | `true`                       |
+| `INPUT_SCAN_NODE_MODULES` | `scan-node-modules` input | `boolean`                     | `false`                      |
+| `INPUT_OUTPUT_FORMAT`     | `output-format` input     | `'text' \| 'json' \| 'sarif'` | `text`                       | 
+| `INPUT_WORKING_DIRECTORY` | `working-directory` input | `string`                      | `.`                          |
+| `INPUT_ALLOWLIST_PATH`    | `allowlist-path` input    | `string`                      | `.shai-hulud-allowlist.json` |
+| `INPUT_IGNORE_ALLOWLIST`  | `ignore-allowlist` input  | `boolean`                     | `false`                      |
+| `INPUT_WARN_ON_ALLOWLIST` | `warn-on-allowlist` input | `boolean`                     | `false`                      |
 
 ---
 
@@ -872,6 +962,7 @@ When running locally or in non-GitHub CI systems:
       "location": "package-lock.json"
     }
   ],
+  "scannedFilesCount": 2,
   "scannedFiles": ["package.json", "package-lock.json"],
   "scanTime": 67
 }
@@ -1154,7 +1245,7 @@ git clone https://github.com/YOUR_USERNAME/Shai-Hulud-2.0-Detector.git
 cd Shai-Hulud-2.0-Detector
 
 # 2. Install dependencies
-npm install
+npm ci
 
 # 3. Make changes to src/
 

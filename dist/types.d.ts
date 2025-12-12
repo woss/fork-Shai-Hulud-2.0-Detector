@@ -67,6 +67,7 @@ export interface SecurityFinding {
     location: string;
     line?: number;
     evidence?: string;
+    sha256?: string;
 }
 /**
  * Allowlist entry for excluding false positives from scan results.
@@ -88,6 +89,8 @@ export interface AllowlistEntry {
     locationContains?: string;
     /** Substring match on evidence field */
     evidenceContains?: string;
+    /** Exact SHA256 hash match, used for file and script contents */
+    sha256?: string;
     /** Documentation comment (not used in matching) */
     comment?: string;
 }
